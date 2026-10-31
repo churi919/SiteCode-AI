@@ -242,3 +242,159 @@ test('numbered model questions retain model findings and evidence',async()=>{
   assert.equal(context.project.retrievedSources.length,4);
  }
 });
+
+const selectedFindingBase = {
+  ...base,
+  project: { ...base.project, selectedCode: null, selectedFindingId: 'FEA-03' },
+};
+
+test('screenshot question resolves to the selected source-model issue without chat history', async () => {
+  const question = '具体是哪些规范';
+  assert.equal(classifyChatQuestion(question, [], selectedFindingBase).intent, 'model');
+  const context = await buildChatContext(question, [], selectedFindingBase);
+  assert.equal(context.project.intent, 'model');
+  assert.equal(context.project.needsClarification, false);
+  assert.ok(context.findings.some(finding => finding.id === 'FEA-03'));
+  assert.equal(context.project.modelContext.selectedFindingId, 'FEA-03');
+  const criterion = context.project.retrievedSources.find(source => /Table 4\.2A/.test(source.clause || ''));
+  assert.ok(criterion, 'The selected high-rise issue needs its actual width criterion');
+  assert.equal(criterion.sourceType, 'verified-clause-summary');
+  assert.match(criterion.excerpt, /7 m/);
+});
+
+test('short clause, evidence and design-action follow-ups retain the preceding model discussion', async () => {
+  const history = [
+    { role: 'user', content: '我们不符合的具体条款是哪些' },
+    { role: 'assistant', content: 'The model has three screening failures and one review candidate.' },
+  ];
+  for (const question of ['具体是哪些规范', '具体条款是什么', '依据是什么', '怎么改']) {
+    const context = await buildChatContext(question, history, base);
+    assert.equal(context.project.intent, 'model', question);
+    assert.equal(context.project.followUp, true, question);
+    assert.deepEqual(context.findings, garden.findings, question);
+    assert.equal(context.findings.find(finding => finding.id === 'FEA-04').status, 'review');
+    assert.ok(context.project.retrievedSources.some(source => source.evidenceOrigin === 'model-rule-evidence'));
+  }
+});
+
+test('a resolved model scope survives consecutive short follow-ups', async () => {
+  const history = [
+    { role: 'user', content: '具体是哪些规范', scope: { intent: 'model', topic: null } },
+    { role: 'assistant', content: 'FEA-03 refers to the supplied high-rise accessway criterion.' },
+  ];
+  const context = await buildChatContext('怎么改', history, base);
+  assert.equal(context.project.intent, 'model');
+  assert.equal(context.project.followUp, true);
+  assert.ok(context.findings.some(finding => finding.id === 'FEA-03'));
+  assert.ok(context.project.retrievedSources.some(source => /Table 4\.2A/.test(source.clause || '')));
+});
+
+for (const [priorQuestion, topic, agency] of [
+  ['无障碍坡道坡度怎么确定', 'accessibility', 'BCA'],
+  ['场地排水需要核对哪些信息', 'drainage', 'PUB'],
+]) {
+  test(`generic source follow-up keeps the previous ${topic} topic ahead of a selected fire issue`, async () => {
+    const history = [
+      { role: 'user', content: priorQuestion },
+      { role: 'assistant', content: 'Read the relevant local evidence. A separate fire-model issue is also visible.' },
+    ];
+    const context = await buildChatContext('具体是哪些规范', history, selectedFindingBase);
+    assert.equal(context.project.intent, 'code');
+    assert.equal(context.project.topic, topic);
+    assert.equal(context.project.followUp, true);
+    assert.deepEqual(context.findings, []);
+    assert.equal(context.project.modelContext, null);
+    assert.ok(context.project.retrievedSources.length > 0);
+    assert.ok(context.project.retrievedSources.every(source => source.agency === agency));
+    assert.ok(context.project.retrievedSources.every(source => source.evidenceOrigin !== 'model-rule-evidence'));
+  });
+}
+
+test('an explicit new drainage question overrides the preceding model scope and selected fire issue', async () => {
+  const history = [
+    { role: 'user', content: '这个模型先改哪里', scope: { intent: 'model', topic: null } },
+    { role: 'assistant', content: 'Review FEA-03 under the supplied SCDF criterion.' },
+  ];
+  const context = await buildChatContext('场地排水具体需要哪些规范', history, selectedFindingBase);
+  assert.equal(context.project.intent, 'code');
+  assert.equal(context.project.topic, 'drainage');
+  assert.equal(context.project.followUp, false);
+  assert.deepEqual(context.findings, []);
+  assert.ok(context.project.retrievedSources.length > 0);
+  assert.ok(context.project.retrievedSources.every(source => source.agency === 'PUB'));
+});
+
+test('an unknown selected issue cannot supply model findings to an ambiguous code question', async () => {
+  const unknownSelection = {
+    ...selectedFindingBase,
+    project: { ...selectedFindingBase.project, selectedFindingId: 'FEA-99' },
+  };
+  const question = '具体是哪些规范';
+  assert.notEqual(classifyChatQuestion(question, [], unknownSelection).intent, 'model');
+  const context = await buildChatContext(question, [], unknownSelection);
+  assert.deepEqual(context.findings, []);
+  assert.equal(context.project.modelContext, null);
+  assert.ok(context.project.retrievedSources.every(source => source.evidenceOrigin !== 'model-rule-evidence'));
+});
+
+test('greetings stay general even when a model issue is selected', async () => {
+  for (const question of ['你好', '早上好']) {
+    const context = await buildChatContext(question, [], selectedFindingBase);
+    assert.equal(context.project.intent, 'general');
+    assert.deepEqual(context.findings, []);
+    assert.equal(context.project.modelContext, null);
+    assert.deepEqual(context.project.retrievedSources, []);
+  }
+});
+
+test('a short question follows the latest explicit code topic rather than reviving an older fire discussion', async () => {
+  const history = [
+    { role: 'user', content: '这个模型哪里不合规', scope: { intent: 'model', topic: 'fire' } },
+    { role: 'assistant', content: 'FEA-01 is associated with an SCDF clause summary.' },
+    { role: 'user', content: '换个话题，无障碍坡道坡度怎么确定', scope: { intent: 'code', topic: 'accessibility' } },
+    { role: 'assistant', content: 'Use the BCA ramp provisions. The separate fire-road finding is unchanged.' },
+  ];
+  const context = await buildChatContext('具体是哪些规范', history, selectedFindingBase);
+  assert.equal(context.project.intent, 'code');
+  assert.equal(context.project.topic, 'accessibility');
+  assert.deepEqual(context.findings, []);
+  assert.ok(context.project.retrievedSources.length > 0);
+  assert.ok(context.project.retrievedSources.every(source => source.agency === 'BCA'));
+});
+
+test('a clear general-topic change blocks an older model scope from being revived', async () => {
+  const history = [
+    { role: 'user', content: '这个模型哪里不合规', scope: { intent: 'model', topic: 'fire' } },
+    { role: 'assistant', content: 'FEA-03 needs review against the supplied accessway criterion.' },
+    { role: 'user', content: '换个话题，请写一首关于秋天的诗', scope: { intent: 'general', topic: null } },
+    { role: 'assistant', content: 'Here is a short poem about autumn.' },
+  ];
+  const context = await buildChatContext('具体是哪些规范', history, selectedFindingBase);
+  assert.notEqual(context.project.intent, 'model');
+  assert.deepEqual(context.findings, []);
+  assert.ok(context.project.retrievedSources.every(source => source.evidenceOrigin !== 'model-rule-evidence'));
+});
+
+for (const [question, topic, agency] of [
+  ['这条无障碍坡道规范怎么应用', 'accessibility', 'BCA'],
+  ['这条排水规范怎么应用', 'drainage', 'PUB'],
+]) {
+  test(`explicit ${topic} wording overrides an unrelated selected SCDF clause`, async () => {
+    const context = await buildChatContext(question, [], {
+      ...selectedFindingBase,
+      project: {
+        ...selectedFindingBase.project,
+        selectedCode: CODE_LIBRARY.find(code => code.id === 'road-width'),
+      },
+    });
+    assert.equal(context.project.intent, 'code');
+    assert.equal(context.project.topic, topic);
+    assert.equal(context.project.needsClarification, false);
+    assert.deepEqual(context.findings, []);
+    assert.equal(context.project.modelContext, null);
+    assert.equal(context.project.selectedCode, null);
+    assert.ok(context.project.retrievedSources.length > 0);
+    assert.ok(context.project.retrievedSources.every(source => source.agency === agency));
+    assert.ok(context.project.retrievedSources.every(source => source.evidenceOrigin !== 'model-rule-evidence'));
+  });
+}
