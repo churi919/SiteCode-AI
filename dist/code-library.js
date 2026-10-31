@@ -1,0 +1,31 @@
+/** Curated source-linked clauses. Candidates are review prompts, never measured results. */
+const CHAPTER = 'https://www.scdf.gov.sg/fire-safety-services-listing/fire-code-2023/table-of-content/chapter-4-site-planning-external-firefighting-provision/';
+const ACCESS_SOURCE = `${CHAPTER}clause-4.2-provision-for-external-access-to-building-for-firefighting-and-accessibility-of-site-to-firefighting-appliances`;
+const HYDRANT_SOURCE = `${CHAPTER}clause-4.4-private-fire-hydrant`;
+const bi = (en, zh) => Object.freeze({ en, zh });
+const entry = (value) => Object.freeze({ sourceUrl: ACCESS_SOURCE, sourceChecked: '2026-10-31', status: 'candidate', ...value, requiredInputs: Object.freeze(value.requiredInputs) });
+
+export const CODE_LIBRARY = Object.freeze([
+  entry({ id: 'road-width', clause: '4.2.1c', title: bi('Clear road width', '消防车道净宽'), summary: bi('Access roads.', '适用于消防车道。'), requirements: bi('≥4 m.', '至少 4 米。'), category: 'access', anchor: 'road', requiredInputs: ['accessType', 'clearWidth'], status: 'screened', ruleId: 'width' }),
+  entry({ id: 'outdoor-distance', clause: '4.2.2a.(4)', title: bi('Outdoor access distance', '室外消防可达距离'), summary: bi('PG IV demo: habitable height ≤10 m.', 'PG IV 演示：居住高度不超过 10 米。'), requirements: bi('≤45 m; every projected-plan point.', '建筑投影各点的行走距离不超过 45 米。'), category: 'access', anchor: 'building', requiredInputs: ['purposeGroup', 'habitableHeight', 'outdoorPath'], status: 'screened', ruleId: 'path' }),
+  entry({ id: 'dead-end-turning', clause: '4.2.2e.(1)', title: bi('Dead-end turning', '尽端回车条件'), summary: bi('Dead ends.', '适用于尽端。'), requirements: bi('Above 46 m: prescribed turning.', '超过 46 米须设规定回车设施。'), category: 'access', anchor: 'road', requiredInputs: ['deadEndLength', 'turningFacility', 'turningVerified'], status: 'screened', ruleId: 'turning' }),
+  entry({ id: 'road-gradient', clause: '4.2.2d', title: bi('Road gradient', '消防车道坡度'), summary: bi('Roads, not accessways.', '此阈值适用于消防车道。'), requirements: bi('No steeper than 1:8.3.', '不陡于 1:8.3。'), category: 'access', anchor: 'road', requiredInputs: ['accessType', 'gradientDenominator'], status: 'screened', ruleId: 'gradient' }),
+  entry({ id: 'overhead-clearance', clause: '4.2.2f.(1)', title: bi('Overhead clearance', '上方结构净空'), summary: bi('Under structures.', '适用于上方结构下。'), requirements: bi('≥4.5 m.', '至少 4.5 米。'), category: 'overhead', anchor: 'canopy', requiredInputs: ['hasOverhead', 'overheadClearance'], status: 'screened', ruleId: 'clearance' }),
+  entry({ id: 'overhead-width', clause: '4.2.2f.(2)', title: bi('Overhead structure width', '上方结构宽度'), summary: bi('Structures over access.', '适用于跨越通道的结构。'), requirements: bi('≤10 m.', '不超过 10 米。'), category: 'overhead', anchor: 'canopy', requiredInputs: ['overheadStructureWidth'] }),
+  entry({ id: 'overhead-separation', clause: '4.2.2f.(3)', title: bi('Structure separation', '上方结构间距'), summary: bi('Multiple overhead structures.', '适用于多处上方结构。'), requirements: bi('Adjacent structures ≥20 m apart.', '相邻结构间隔至少 20 米。'), category: 'overhead', anchor: 'canopy', requiredInputs: ['overheadStructureLocations', 'overheadSeparation'] }),
+  entry({ id: 'uncovered-end-stretch', clause: '4.2.2f.(4)', title: bi('Uncovered end stretch', '尽端无顶路段'), summary: bi('Route end.', '适用于通道尽端。'), requirements: bi('≥20 m without overhead structures.', '至少 20 米无上方结构。'), category: 'overhead', anchor: 'road', requiredInputs: ['endStretchLength', 'overheadStructureLocations'] }),
+  entry({ id: 'accessway-setback', clause: '4.2.2c', title: bi('Accessway setback', '消防车作业场地退距'), summary: bi('Accessways only; exceptions apply.', '仅适用于消防车作业场地；须核对例外。'), requirements: bi('Normally 2–10 m; specified 13 m exception.', '通常 2–10 米；特定条件可放宽至 13 米。'), category: 'site', anchor: 'building', requiredInputs: ['accessType', 'fireAccessOpeningLocation', 'accesswayNearEdge', 'openingHeightDifference', 'setbackExceptionEligibility'] }),
+  entry({ id: 'appliance-loading', clause: '4.2.2j.(2)', title: bi('Appliance loading', '消防车辆承载'), summary: bi('Structural verification.', '需结构核实。'), requirements: bi('Tables 4.2D/4.2E; linking roads follow accessway specifications.', '按表 4.2D/4.2E；连接作业场地的道路按相应场地要求。'), category: 'site', anchor: 'road', requiredInputs: ['pavementStructuralCapacity', 'applianceLoadingClass', 'linkingAccessway', 'structuralVerification'] }),
+  entry({ id: 'route-markings', clause: '4.2.2i.(2)', title: bi('Reflective route markings', '通道反光标识'), summary: bi('Public-road exception.', '须核对公共道路豁免。'), requirements: bi('White/yellow: strips ≥100×400 mm or studs ≥100×100×18 mm; alternating spacing ≤5 m.', '白/黄色：标带至少 100×400 毫米，或道钉至少 100×100×18 毫米；交错间隔不超过 5 米。'), category: 'site', anchor: 'road', requiredInputs: ['isPublicRoad', 'markingType', 'markingDimensions', 'markingSpacing', 'cornerMarkings', 'visibility'] }),
+  entry({ id: 'unobstructed-access', clause: '4.2.2h', title: bi('Unobstructed access', '消防通道无障碍'), summary: bi('Route and opening access.', '适用于通道及通向救援口的路径。'), requirements: bi('Keep unobstructed.', '保持畅通无阻。'), category: 'access', anchor: 'entry', requiredInputs: ['obstructionGeometry', 'fireAccessOpeningLocations', 'barrierOperation'] }),
+  entry({ id: 'hydrant-coverage', clause: '4.4.1a', title: bi('Fire hydrant coverage', '消火栓覆盖'), summary: bi('Every road/accessway part; horizontal along-access measurement.', '覆盖车道/作业场地各处；沿作业场地水平测量。'), requirements: bi('Unobstructed distance ≤50 m to a hydrant; otherwise provide private hydrants.', '至消火栓无障碍距离不超过 50 米，否则须设私有消火栓。'), category: 'hydrant', anchor: 'road', requiredInputs: ['hydrantLocations', 'accessRouteGeometry', 'unobstructedHydrantDistance'], sourceUrl: HYDRANT_SOURCE }),
+]);
+
+const normalize = (value) => String(value ?? '').normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
+const searchable = (code) => normalize([code.id, code.clause, code.category, code.title.en, code.title.zh, code.summary.en, code.summary.zh, code.requirements.en, code.requirements.zh].join(' '));
+
+/** AND keyword search in English/Chinese text or clause number; preserves library order. */
+export function searchCodes(query = '', category = 'all') {
+  const words = normalize(query).split(' ').filter(Boolean);
+  return CODE_LIBRARY.filter(code => (category === 'all' || code.category === category) && words.every(word => searchable(code).includes(word)));
+}
