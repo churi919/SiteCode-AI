@@ -6,11 +6,13 @@ A bilingual design-review demonstration using the supplied **garden_condo_before
 
 ![AI answer linked to the model and concrete design actions / AI 回答联动模型与修改建议](docs/demo-preview.jpg)
 
-## Co-creators · 共创者
+## Authors & co-creators · 作者与共创者
 
 Co-created by [@churi919](https://github.com/churi919) and [@Jacksonwang0913](https://github.com/Jacksonwang0913).
 
 由 [@churi919](https://github.com/churi919) 与 [@Jacksonwang0913](https://github.com/Jacksonwang0913) 共同创作。
+
+Author list / 作者名单：[AUTHORS.md](AUTHORS.md).
 
 ## Start · 启动
 
