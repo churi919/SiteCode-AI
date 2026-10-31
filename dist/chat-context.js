@@ -11,6 +11,8 @@ const MODEL=/这个模型|当前模型|本模型|我们的模型|这个方案|�
 const CODE=/规范|条文|条款|要求|标准|\bcode|regulat|requirement|坡度|净宽|净空|平台|楼梯|电梯|中庭|栏杆|护栏|走廊|门宽|厕所|卫生间|采光|通风|退界|建筑|施工|landing|stair|lift|corridor|toilet|ventila|setback|building/i;
 const SELECTED=/选中|这条|该条|这份|这一条|此条|selected|this clause|this provision|this source|this section|this document/i;
 const ISSUE_ID=/(^|[^a-z0-9_-])FEA-\d{2}(?=$|[^a-z0-9_-])/i;
+const SITE=/周边|周围|附近|旁边|邻近|邻里|街区|场地关系|选址|地块|建筑朝向|道路.{0,12}(?:关系|连接|接入)|(?:入口|朝向).{0,12}(?:道路|街道)|最近.{0,8}(?:道路|建筑|绿地|水体|设施)|osm|openstreetmap|surround|neighbou?r|site context|site relationship|orientation|nearest (?:road|building|park)/i;
+const NORMATIVE=/规范|条款|条文|规定|法定|合规|违规|标准|强制|code|regulat|compliance|statutory/i;
 function shortFollowUp(q){
  if(q.length>120)return false;
  if(/^(?:怎么(?:改|调整|解决)|如何(?:改|调整|解决)|怎么办|还有呢|依据是什么|依据呢|how (?:to )?(?:fix|change|improve)|what about that)[\s\S]*$/i.test(q))return true;
@@ -24,18 +26,19 @@ async function selectedSource(selected){
  return {docId:selected.id,title:text(selected.title),agency:'SCDF',page:null,clause:selected.clause,sourceType:'verified-clause-summary',excerpt:[text(selected.summary),text(selected.requirements),selected.requirements?.zh||''].join('\n'),officialUrl:selected.sourceUrl,pdfUrl:'',versionNote:selected.versionNote||'Clause summary; consult complete source and applicability.'};
 }
 export function classifyChatQuestion(question,history=[],baseContext={}){
- const q=question.trim(),modelQuestion=MODEL.test(q)||/我们模型/.test(q)||ISSUE_ID.test(q);
- let topic=TOPICS.find(t=>t.match.test(q)),intent=modelQuestion?'model':topic||CODE.test(q)?'code':'general',followUp=false,previousQuery='',contextOrigin='question';
+ const q=question.trim(),modelQuestion=MODEL.test(q)||/我们模型/.test(q)||ISSUE_ID.test(q),siteQuestion=SITE.test(q)&&!NORMATIVE.test(q);
+ let topic=siteQuestion?null:TOPICS.find(t=>t.match.test(q)),intent=siteQuestion?'site':modelQuestion?'model':topic||CODE.test(q)?'code':'general',followUp=false,previousQuery='',contextOrigin='question';
  const priorUsers=history.filter(t=>t.role==='user'&&typeof t.content==='string').slice(-8);
  const followUpQuestion=shortFollowUp(q);
- if(!topic&&!modelQuestion&&followUpQuestion){
+ if(!siteQuestion&&!topic&&!modelQuestion&&followUpQuestion){
   const last=priorUsers.at(-1);
   if(last){
    // Use the most recent user scope. Assistant prose and older unrelated topics
    // must never pull a fresh question back into the fire-model review.
-   const saved=last.scope,prior=saved&&['model','code','general'].includes(saved.intent)?saved:classifyChatQuestion(last.content,priorUsers.slice(0,-1));
-   if(['model','code'].includes(prior.intent)){
+   const saved=last.scope,prior=saved&&['model','code','general','site'].includes(saved.intent)?saved:classifyChatQuestion(last.content,priorUsers.slice(0,-1));
+   if(['model','code','site'].includes(prior.intent)){
     intent=prior.intent;topic=TOPICS.find(t=>t.id===prior.topic);followUp=true;previousQuery=prior.query||last.content;contextOrigin='conversation';
+    if(intent==='site'&&NORMATIVE.test(q)){intent=(baseContext.findings||[]).some(f=>f.id===baseContext.project?.selectedFindingId)?'model':'code';}
    }
   }else{
    const selectedId=baseContext.project?.selectedFindingId,knownSelection=(baseContext.findings||[]).some(f=>f.id===selectedId);
@@ -71,5 +74,5 @@ export async function buildChatContext(question,history=[],baseContext={}){
  }
  const modelRelevant=classification.intent==='model'&&(!classification.topic||classification.topic==='fire');
  if(modelRelevant){const summaries=ruleSources(baseContext.findings||[]);retrievedSources=[...summaries,...retrievedSources].slice(0,5);}
- return {findings:modelRelevant?(baseContext.findings||[]):[],project:{question,intent:classification.intent,topic:classification.topic,followUp:classification.followUp,contextOrigin:classification.contextOrigin,retrievalQuery:classification.query,needsClarification:classification.needsClarification,groundingMode:'local-source-first',retrievedSources,retrievalError,modelContext:classification.intent==='model'?{...base,selectedCode:modelRelevant?base.selectedCode:null}:null,history:history.slice(-6).map(t=>({role:t.role,content:t.content.slice(0,1000)})),selectedCode:modelRelevant?base.selectedCode:null}};
+ return {findings:modelRelevant?(baseContext.findings||[]):[],project:{question,intent:classification.intent,topic:classification.topic,followUp:classification.followUp,contextOrigin:classification.contextOrigin,retrievalQuery:classification.query,needsClarification:classification.needsClarification,groundingMode:'local-source-first',retrievedSources,retrievalError,surroundings:['model','site'].includes(classification.intent)?base.surroundings||null:null,modelContext:classification.intent==='model'?{...base,surroundings:undefined,selectedCode:modelRelevant?base.selectedCode:null}:null,history:history.slice(-6).map(t=>({role:t.role,content:t.content.slice(0,1000)})),selectedCode:modelRelevant?base.selectedCode:null}};
 }
