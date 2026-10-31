@@ -8,9 +8,9 @@ A bilingual design-review demonstration using the supplied **garden_condo_before
 
 ## Authors & co-creators · 作者与共创者
 
-Co-created by [@churi919](https://github.com/churi919) and [@Jacksonwang0913](https://github.com/Jacksonwang0913).
+Co-created by [@churi919](https://github.com/churi919), [@Jacksonwang0913](https://github.com/Jacksonwang0913), and [@LilineLIN](https://github.com/LilineLIN).
 
-由 [@churi919](https://github.com/churi919) 与 [@Jacksonwang0913](https://github.com/Jacksonwang0913) 共同创作。
+由 [@churi919](https://github.com/churi919)、[@Jacksonwang0913](https://github.com/Jacksonwang0913) 与 [@LilineLIN](https://github.com/LilineLIN) 共同创作。
 
 Author list / 作者名单：[AUTHORS.md](AUTHORS.md).
 
