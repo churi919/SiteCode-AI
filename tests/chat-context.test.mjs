@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 import { classifyChatQuestion, buildChatContext } from '../dist/chat-context.js';
 import { CODE_LIBRARY } from '../dist/code-library.js';
+import { toGeo } from '../dist/parcel.js';
+import { analyzeSiteContext, compactSiteContext } from '../dist/site-analysis.js';
 
 const corpusBytes = await readFile(new URL('../dist/assets/local-codes.json.gz', import.meta.url));
 const actualCorpus = JSON.parse(gunzipSync(corpusBytes));
@@ -398,3 +400,64 @@ for (const [question, topic, agency] of [
     assert.ok(context.project.retrievedSources.every(source => source.evidenceOrigin !== 'model-rule-evidence'));
   });
 }
+
+const surroundingSite={lat:1.2996,lng:103.7875};
+const surroundingCoordinate=(x,z)=>{const p=toGeo({x,z},surroundingSite);return[p.lng,p.lat];};
+const observedSurroundings=compactSiteContext(analyzeSiteContext({
+ site:surroundingSite,
+ placement:{x:0,z:0,rotation:0},
+ model:{width:32,depth:22,offset:{x:8,z:-16.5},basis:'native-tower-footprint'},
+ data:{source:'OpenStreetMap',status:'live',center:surroundingSite,radius:500,fetchedAt:'2026-10-31T07:00:00Z',complete:true,features:[
+  {id:'way/101',kind:'road',name:'North Street',tags:{highway:'residential'},geometry:{type:'LineString',coordinates:[surroundingCoordinate(-100,-40),surroundingCoordinate(100,-40)]}},
+  {id:'way/102',kind:'building',name:'Mapped neighbour',tags:{building:'yes'},geometry:{type:'Polygon',coordinates:[[40,20],[50,20],[50,30],[40,30],[40,20]].map(([x,z])=>surroundingCoordinate(x,z))}},
+ ]},
+}));
+const surroundingBase={...base,project:{...base.project,site:surroundingSite,selectedCode:null,selectedFindingId:'FEA-03',surroundings:observedSurroundings}};
+
+test('OSM relationship questions carry geographic observations without fabricating regulatory evidence',async()=>{
+ const question='当前模型与周边道路、建筑是什么关系？';
+ assert.equal(classifyChatQuestion(question,[],surroundingBase).intent,'site');
+ const context=await buildChatContext(question,[],surroundingBase);
+ assert.equal(context.project.intent,'site');assert.deepEqual(context.findings,[]);
+ assert.equal(context.project.modelContext,null);assert.equal(context.project.selectedCode,null);
+ assert.deepEqual(context.project.retrievedSources,[],'OSM observations are not imported code clauses');
+ assert.equal(context.project.surroundings.source,'OpenStreetMap');
+ const road=context.project.surroundings.relations.find(r=>r.id==='CTX-road');
+ assert.equal(road.distanceM,12.5);assert.equal(road.sourceUrl,'https://www.openstreetmap.org/way/101');
+ assert.equal(road.status,'review');assert.equal(road.width,'not tagged');
+ assert.equal(Object.hasOwn(context.project.surroundings,'features'),false);
+});
+
+test('explicit accessibility and drainage code questions exclude unrelated OSM context',async()=>{
+ for(const [question,topic,agency] of [['周边无障碍坡道规范有哪些','accessibility','BCA'],['周边排水规范有哪些','drainage','PUB']]){
+  const context=await buildChatContext(question,[],surroundingBase);
+  assert.equal(context.project.intent,'code');assert.equal(context.project.topic,topic);
+  assert.equal(context.project.surroundings,null);assert.equal(context.project.modelContext,null);
+  assert.deepEqual(context.findings,[]);assert.ok(context.project.retrievedSources.length);
+  assert.ok(context.project.retrievedSources.every(source=>source.agency===agency&&source.sourceType==='local-pdf'));
+ }
+});
+
+test('a short design follow-up continues the site discussion rather than switching to a selected fire issue',async()=>{
+ const history=[
+  {role:'user',content:'分析建筑与周边道路的关系',scope:{intent:'site',topic:null}},
+  {role:'assistant',content:'The observed road centreline is 12.5 m from the proposed tower footprint.'},
+ ];
+ const context=await buildChatContext('怎么改',history,surroundingBase);
+ assert.equal(context.project.intent,'site');assert.equal(context.project.followUp,true);
+ assert.deepEqual(context.findings,[]);assert.deepEqual(context.project.retrievedSources,[]);
+ assert.deepEqual(context.project.surroundings,observedSurroundings);
+ assert.ok(context.project.surroundings.relations.some(r=>r.featureId==='way/101'));
+});
+
+test('model review retains compact OSM context alongside separately labelled code criteria',async()=>{
+ const context=await buildChatContext('我们模型不符合的具体条款是哪些',[],surroundingBase);
+ assert.equal(context.project.intent,'model');assert.deepEqual(context.findings,garden.findings);
+ assert.deepEqual(context.project.surroundings,observedSurroundings);
+ assert.equal(context.project.modelContext.surroundings,undefined,'Do not duplicate the geographic payload inside model evidence');
+ assert.equal(context.project.retrievedSources.length,4);
+ assert.ok(context.project.retrievedSources.every(source=>source.sourceType==='verified-clause-summary'&&source.evidenceOrigin==='model-rule-evidence'));
+ assert.ok(context.project.retrievedSources.every(source=>source.officialUrl.startsWith('https://www.scdf.gov.sg/')));
+ assert.ok(!context.project.retrievedSources.some(source=>source.excerpt.includes('North Street')));
+ assert.equal(context.findings.find(f=>f.id==='FEA-04').status,'review');
+});
