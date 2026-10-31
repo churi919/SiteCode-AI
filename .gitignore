@@ -1,0 +1,14 @@
+site.tar.gz
+.env
+.env.*
+!.env.example
+build-output/
+dist/server/
+dist/.openai/
+.local/
+dist/assets/garden-condo.glb
+.portable-cache/
+qa/
+node_modules/
+.openai/
+.github-publish/
