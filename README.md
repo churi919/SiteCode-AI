@@ -6,6 +6,12 @@ A bilingual design-review demonstration using the supplied **garden_condo_before
 
 ![AI answer linked to the model and concrete design actions / AI 回答联动模型与修改建议](docs/demo-preview.jpg)
 
+## Co-creators · 共创者
+
+Co-created by [@churi919](https://github.com/churi919) and [@Jacksonwang0913](https://github.com/Jacksonwang0913).
+
+由 [@churi919](https://github.com/churi919) 与 [@Jacksonwang0913](https://github.com/Jacksonwang0913) 共同创作。
+
 ## Start · 启动
 
 Right-click **Start-Demo.ps1 → Run with PowerShell**. It starts the local server and opens `http://127.0.0.1:4173`. If scripts are blocked, run the following in this folder, then open that address:
